@@ -1,3 +1,4 @@
+import { ApiClient } from "./api.js";
 import { BatchProcessor } from "./batch-processor.js";
 import { type NodeLoomConfig, resolveConfig, type ResolvedConfig } from "./config.js";
 import { Trace } from "./trace.js";
@@ -31,6 +32,7 @@ import type {
 export class NodeLoomClient {
   private readonly config: ResolvedConfig;
   private readonly processor: BatchProcessor;
+  private _api: ApiClient | null = null;
   private isShutdown = false;
 
   constructor(config: NodeLoomConfig) {
@@ -40,6 +42,17 @@ export class NodeLoomClient {
     if (!this.config.disabled) {
       this.processor.start();
     }
+  }
+
+  /**
+   * Access the REST API client.
+   * Uses the same API key and endpoint as the telemetry client.
+   */
+  get api(): ApiClient {
+    if (!this._api) {
+      this._api = new ApiClient(this.config.apiKey, this.config.endpoint);
+    }
+    return this._api;
   }
 
   /**

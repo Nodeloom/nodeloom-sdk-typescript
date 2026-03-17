@@ -36,6 +36,10 @@
 // Core client
 export { NodeLoomClient } from "./client.js";
 
+// API client
+export { ApiClient, ApiError } from "./api.js";
+export type { ApiRequestOptions } from "./api.js";
+
 // Trace and span
 export { Trace } from "./trace.js";
 export { Span } from "./span.js";
