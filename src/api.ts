@@ -274,6 +274,20 @@ export class ApiClient {
 
   // ── Metrics Operations ───────────────────────────────────
 
+  // ── Agent Callback Operations ──────────────────────────────
+
+  async setCallbackUrl(agentName: string, callbackUrl: string): Promise<unknown> {
+    return this.request(`/api/sdk/v1/agents/${agentName}/callback`, {
+      method: "POST", body: { callback_url: callbackUrl },
+    });
+  }
+
+  async removeCallbackUrl(agentName: string): Promise<void> {
+    return this.request(`/api/sdk/v1/agents/${agentName}/callback`, { method: "DELETE" });
+  }
+
+  // ── Metrics Operations ───────────────────────────────────
+
   async getMetrics(options?: { name?: string; from?: string; to?: string }): Promise<unknown> {
     const params: Record<string, string> = {};
     if (options?.name) params.name = options.name;
