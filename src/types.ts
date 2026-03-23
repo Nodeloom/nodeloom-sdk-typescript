@@ -49,6 +49,7 @@ export interface TraceStartEvent {
   agent_name: string;
   agent_version?: string;
   environment?: string;
+  session_id?: string;
   input?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   timestamp: string;
@@ -69,6 +70,8 @@ export interface SpanEvent {
   output?: Record<string, unknown>;
   error?: string;
   token_usage?: TokenUsageWire;
+  prompt_template?: string;
+  prompt_version?: number;
   timestamp: string;
   end_timestamp: string;
 }
@@ -100,11 +103,37 @@ export interface StandaloneEvent {
 /**
  * Union of all telemetry event types.
  */
+/**
+ * A metric event for custom numeric metrics.
+ */
+export interface MetricEvent {
+  type: "metric";
+  trace_id: string | null;
+  metric_name: string;
+  metric_value: number;
+  metric_unit?: string;
+  metric_tags?: Record<string, string>;
+  timestamp: string;
+}
+
+/**
+ * A feedback event tied to a trace.
+ */
+export interface FeedbackEvent {
+  type: "feedback";
+  trace_id: string;
+  rating: number;
+  comment?: string;
+  timestamp: string;
+}
+
 export type TelemetryEvent =
   | TraceStartEvent
   | SpanEvent
   | TraceEndEvent
-  | StandaloneEvent;
+  | StandaloneEvent
+  | MetricEvent
+  | FeedbackEvent;
 
 /**
  * Batch payload sent to the telemetry endpoint.
@@ -123,6 +152,7 @@ export interface TraceOptions {
   metadata?: Record<string, unknown>;
   agentVersion?: string;
   environment?: string;
+  sessionId?: string;
 }
 
 /**

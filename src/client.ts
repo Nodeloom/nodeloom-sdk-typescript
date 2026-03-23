@@ -113,6 +113,42 @@ export class NodeLoomClient {
   }
 
   /**
+   * Emit a custom metric event.
+   */
+  metric(
+    name: string,
+    value: number,
+    options?: { unit?: string; tags?: Record<string, string>; traceId?: string }
+  ): void {
+    if (this.isShutdown || this.config.disabled) return;
+    const event: Record<string, unknown> = {
+      type: "metric",
+      trace_id: options?.traceId ?? null,
+      metric_name: name,
+      metric_value: value,
+      timestamp: new Date().toISOString(),
+    };
+    if (options?.unit) event.metric_unit = options.unit;
+    if (options?.tags) event.metric_tags = options.tags;
+    this.processor.enqueue(event as any);
+  }
+
+  /**
+   * Emit a feedback event tied to a trace.
+   */
+  feedback(traceId: string, rating: number, comment?: string): void {
+    if (this.isShutdown || this.config.disabled) return;
+    const event: Record<string, unknown> = {
+      type: "feedback",
+      trace_id: traceId,
+      rating,
+      timestamp: new Date().toISOString(),
+    };
+    if (comment) event.comment = comment;
+    this.processor.enqueue(event as any);
+  }
+
+  /**
    * Forces an immediate flush of all pending events.
    *
    * Normally the SDK flushes automatically on a timer and when

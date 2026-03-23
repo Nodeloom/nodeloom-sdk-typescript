@@ -30,6 +30,8 @@ export class Span {
   private outputData?: Record<string, unknown>;
   private tokenUsageData?: TokenUsage;
   private errorMessage?: string;
+  private promptTemplate?: string;
+  private promptVersionNum?: number;
   private status: Status = "success";
   private ended = false;
 
@@ -99,6 +101,32 @@ export class Span {
   }
 
   /**
+   * Record which prompt template and version was used.
+   */
+  setPrompt(template: string, version: number): this {
+    this.promptTemplate = template;
+    this.promptVersionNum = version;
+    return this;
+  }
+
+  /**
+   * Emit a custom metric tied to this span's trace.
+   */
+  metric(name: string, value: number, unit?: string, tags?: Record<string, string>): this {
+    const event: Record<string, unknown> = {
+      type: "metric",
+      trace_id: this.traceId,
+      metric_name: name,
+      metric_value: value,
+      timestamp: new Date().toISOString(),
+    };
+    if (unit) event.metric_unit = unit;
+    if (tags) event.metric_tags = tags;
+    this.processor.enqueue(event as any);
+    return this;
+  }
+
+  /**
    * Creates a child span nested under this span.
    * The child's `parentSpanId` will be set to this span's id.
    */
@@ -153,6 +181,14 @@ export class Span {
 
     if (this.tokenUsageData) {
       event.token_usage = this.serializeTokenUsage(this.tokenUsageData);
+    }
+
+    if (this.promptTemplate) {
+      event.prompt_template = this.promptTemplate;
+    }
+
+    if (this.promptVersionNum !== undefined) {
+      event.prompt_version = this.promptVersionNum;
     }
 
     this.processor.enqueue(event);

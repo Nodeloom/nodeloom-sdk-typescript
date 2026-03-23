@@ -72,7 +72,25 @@ export class Trace {
       startEvent.metadata = options.metadata;
     }
 
+    if (options?.sessionId) {
+      startEvent.session_id = options.sessionId;
+    }
+
     this.processor.enqueue(startEvent);
+  }
+
+  /**
+   * Submit feedback for this trace.
+   */
+  feedback(rating: number, comment?: string): void {
+    const event: Record<string, unknown> = {
+      type: "feedback",
+      trace_id: this.id,
+      rating,
+      timestamp: new Date().toISOString(),
+    };
+    if (comment) event.comment = comment;
+    this.processor.enqueue(event as any);
   }
 
   /**

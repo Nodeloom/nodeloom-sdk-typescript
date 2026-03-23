@@ -176,4 +176,109 @@ export class ApiClient {
       body: { text, ...options },
     });
   }
+
+  // ── Feedback Operations ────────────────────────────────────
+
+  async submitFeedback(request: {
+    execution_id: string;
+    rating: number;
+    comment?: string;
+    tags?: Record<string, string>;
+    trace_id?: string;
+    span_id?: string;
+    user_identifier?: string;
+  }): Promise<unknown> {
+    return this.request("/api/sdk/v1/feedback", { method: "POST", body: request });
+  }
+
+  async listFeedback(executionId?: string, page = 0, size = 20): Promise<unknown> {
+    const params: Record<string, string | number> = { page, size };
+    if (executionId) params.execution_id = executionId;
+    return this.request("/api/sdk/v1/feedback", { params });
+  }
+
+  // ── Sentiment Operations ─────────────────────────────────
+
+  async analyzeSentiment(text: string, traceId?: string): Promise<unknown> {
+    const body: Record<string, unknown> = { text };
+    if (traceId) body.trace_id = traceId;
+    return this.request("/api/sdk/v1/sentiment", { method: "POST", body });
+  }
+
+  // ── Cost Operations ──────────────────────────────────────
+
+  async getCosts(options?: { from?: string; to?: string; workflowId?: string }): Promise<unknown> {
+    const params: Record<string, string> = {};
+    if (options?.from) params.from = options.from;
+    if (options?.to) params.to = options.to;
+    if (options?.workflowId) params.workflow_id = options.workflowId;
+    return this.request("/api/sdk/v1/costs", { params });
+  }
+
+  // ── Webhook Operations ───────────────────────────────────
+
+  async registerWebhook(url: string, secret?: string, eventTypes?: string[]): Promise<unknown> {
+    const body: Record<string, unknown> = { url };
+    if (secret) body.secret = secret;
+    if (eventTypes) body.event_types = eventTypes;
+    return this.request("/api/sdk/v1/alerts/webhooks", { method: "POST", body });
+  }
+
+  async listWebhooks(): Promise<unknown[]> {
+    return this.request<unknown[]>("/api/sdk/v1/alerts/webhooks");
+  }
+
+  async deleteWebhook(webhookId: string): Promise<void> {
+    return this.request(`/api/sdk/v1/alerts/webhooks/${webhookId}`, { method: "DELETE" });
+  }
+
+  // ── Prompt Operations ────────────────────────────────────
+
+  async createPrompt(request: {
+    name: string;
+    content: string;
+    description?: string;
+    variables?: Record<string, unknown>;
+    model_hint?: string;
+  }): Promise<unknown> {
+    return this.request("/api/sdk/v1/prompts", { method: "POST", body: request });
+  }
+
+  async getPrompt(name: string, version?: number): Promise<unknown> {
+    const params: Record<string, string | number> = {};
+    if (version !== undefined) params.version = version;
+    return this.request(`/api/sdk/v1/prompts/${name}`, { params });
+  }
+
+  async listPrompts(): Promise<unknown[]> {
+    return this.request<unknown[]>("/api/sdk/v1/prompts");
+  }
+
+  // ── Red Team Operations ──────────────────────────────────
+
+  async startRedTeamScan(workflowId: string, categories?: string[]): Promise<unknown> {
+    const body: Record<string, unknown> = { workflow_id: workflowId };
+    if (categories) body.categories = categories;
+    return this.request("/api/sdk/v1/redteam/scan", { method: "POST", body });
+  }
+
+  async getRedTeamScan(scanId: string): Promise<unknown> {
+    return this.request(`/api/sdk/v1/redteam/scan/${scanId}`);
+  }
+
+  // ── Evaluation Operations ────────────────────────────────
+
+  async triggerEvaluation(executionId: string): Promise<unknown> {
+    return this.request("/api/sdk/v1/evaluate", { method: "POST", body: { execution_id: executionId } });
+  }
+
+  // ── Metrics Operations ───────────────────────────────────
+
+  async getMetrics(options?: { name?: string; from?: string; to?: string }): Promise<unknown> {
+    const params: Record<string, string> = {};
+    if (options?.name) params.name = options.name;
+    if (options?.from) params.from = options.from;
+    if (options?.to) params.to = options.to;
+    return this.request("/api/sdk/v1/metrics", { params });
+  }
 }
