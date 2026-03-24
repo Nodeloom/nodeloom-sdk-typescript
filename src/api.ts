@@ -286,6 +286,11 @@ export class ApiClient {
     return this.request(`/api/sdk/v1/agents/${agentName}/callback`, { method: "DELETE" });
   }
 
+  /** Get the current guardrail configuration (read-only). Configure via NodeLoom UI. */
+  async getGuardrailConfig(agentName: string): Promise<unknown> {
+    return this.request(`/api/sdk/v1/agents/${agentName}/guardrails`);
+  }
+
   // ── Metrics Operations ───────────────────────────────────
 
   async getMetrics(options?: { name?: string; from?: string; to?: string }): Promise<unknown> {
