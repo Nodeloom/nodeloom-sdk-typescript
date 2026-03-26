@@ -52,6 +52,9 @@ export interface TraceStartEvent {
   session_id?: string;
   input?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
+  framework?: string;
+  framework_version?: string;
+  sdk_language?: string;
   timestamp: string;
 }
 

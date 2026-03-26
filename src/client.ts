@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { ApiClient } from "./api.js";
 import { BatchProcessor } from "./batch-processor.js";
 import { type NodeLoomConfig, resolveConfig, type ResolvedConfig } from "./config.js";
@@ -34,14 +35,41 @@ export class NodeLoomClient {
   private readonly processor: BatchProcessor;
   private _api: ApiClient | null = null;
   private isShutdown = false;
+  private readonly detectedFramework: { name: string; version: string | undefined } | null;
 
   constructor(config: NodeLoomConfig) {
     this.config = resolveConfig(config);
     this.processor = new BatchProcessor(this.config);
+    this.detectedFramework = NodeLoomClient.detectFramework();
 
     if (!this.config.disabled) {
       this.processor.start();
     }
+  }
+
+  private static detectFramework(): { name: string; version: string | undefined } {
+    let req: NodeRequire;
+    try {
+      req = createRequire(import.meta.url);
+    } catch {
+      return { name: "custom", version: undefined };
+    }
+
+    const frameworks = [
+      { pkg: "langchain", name: "langchain" },
+      { pkg: "@langchain/core", name: "langchain" },
+      { pkg: "crewai", name: "crewai" },
+      { pkg: "autogen", name: "autogen" },
+    ];
+    for (const fw of frameworks) {
+      try {
+        const mod = req(fw.pkg);
+        return { name: fw.name, version: mod?.VERSION ?? mod?.version };
+      } catch {
+        // Not installed
+      }
+    }
+    return { name: "custom", version: undefined };
   }
 
   /**
@@ -73,7 +101,7 @@ export class NodeLoomClient {
       );
     }
 
-    return new Trace(agentName, this.processor, this.config, options);
+    return new Trace(agentName, this.processor, this.config, options, this.detectedFramework);
   }
 
   /**

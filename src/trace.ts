@@ -39,7 +39,8 @@ export class Trace {
     agentName: string,
     processor: BatchProcessor,
     config: ResolvedConfig,
-    options?: TraceOptions
+    options?: TraceOptions,
+    framework?: { name: string; version: string | undefined } | null
   ) {
     this.id = crypto.randomUUID();
     this.agentName = agentName;
@@ -75,6 +76,14 @@ export class Trace {
     if (options?.sessionId) {
       startEvent.session_id = options.sessionId;
     }
+
+    if (framework?.name) {
+      startEvent.framework = framework.name;
+      if (framework.version) {
+        startEvent.framework_version = framework.version;
+      }
+    }
+    startEvent.sdk_language = "typescript";
 
     this.processor.enqueue(startEvent);
   }
