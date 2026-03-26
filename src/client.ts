@@ -1,4 +1,3 @@
-import { createRequire } from "node:module";
 import { ApiClient } from "./api.js";
 import { BatchProcessor } from "./batch-processor.js";
 import { type NodeLoomConfig, resolveConfig, type ResolvedConfig } from "./config.js";
@@ -48,11 +47,24 @@ export class NodeLoomClient {
   }
 
   private static detectFramework(): { name: string; version: string | undefined } {
-    let req: NodeRequire;
+    // Probe for installed AI frameworks via dynamic require
+    // Works in both ESM (via createRequire) and CJS (via global require)
+    let resolve: (id: string) => unknown;
     try {
-      req = createRequire(import.meta.url);
+      // Try CJS require first (works in CommonJS builds)
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      resolve = (id: string) => require(id);
+      resolve("node:module"); // test that require works
     } catch {
-      return { name: "custom", version: undefined };
+      try {
+        // ESM fallback: use createRequire
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { createRequire } = require("node:module") as { createRequire: (url: string) => NodeRequire };
+        const req = createRequire(__filename ?? ".");
+        resolve = (id: string) => req(id);
+      } catch {
+        return { name: "custom", version: undefined };
+      }
     }
 
     const frameworks = [
@@ -63,8 +75,8 @@ export class NodeLoomClient {
     ];
     for (const fw of frameworks) {
       try {
-        const mod = req(fw.pkg);
-        return { name: fw.name, version: mod?.VERSION ?? mod?.version };
+        const mod = resolve(fw.pkg) as Record<string, unknown> | undefined;
+        return { name: fw.name, version: (mod?.VERSION ?? mod?.version) as string | undefined };
       } catch {
         // Not installed
       }
