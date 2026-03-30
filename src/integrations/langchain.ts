@@ -85,6 +85,16 @@ export class NodeLoomCallbackHandler {
     this.trace = trace;
   }
 
+  private pruneStaleSpans(): void {
+    if (this.runSpans.size > 1000) {
+      const keys = Array.from(this.runSpans.keys());
+      const toRemove = keys.slice(0, keys.length - 500);
+      for (const key of toRemove) {
+        this.runSpans.delete(key);
+      }
+    }
+  }
+
   // ------------------------------------------------------------------
   // LLM callbacks
   // ------------------------------------------------------------------
@@ -95,6 +105,7 @@ export class NodeLoomCallbackHandler {
     runId: string,
     parentRunId?: string
   ): Promise<void> {
+    this.pruneStaleSpans();
     const llmName = llm.id[llm.id.length - 1] ?? "llm";
     const span = this.trace.span(llmName, SpanType.LLM, {
       parentSpanId: parentRunId
@@ -148,6 +159,7 @@ export class NodeLoomCallbackHandler {
     runId: string,
     parentRunId?: string
   ): Promise<void> {
+    this.pruneStaleSpans();
     const chainName = chain.id[chain.id.length - 1] ?? "chain";
     const span = this.trace.span(chainName, SpanType.Chain, {
       parentSpanId: parentRunId
@@ -189,6 +201,7 @@ export class NodeLoomCallbackHandler {
     runId: string,
     parentRunId?: string
   ): Promise<void> {
+    this.pruneStaleSpans();
     const toolName = tool.id[tool.id.length - 1] ?? "tool";
     const span = this.trace.span(toolName, SpanType.Tool, {
       parentSpanId: parentRunId

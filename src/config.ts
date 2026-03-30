@@ -1,7 +1,7 @@
 /**
  * SDK version string, kept in sync with package.json.
  */
-export const SDK_VERSION = "0.6.0";
+export const SDK_VERSION = "0.7.0";
 
 /**
  * Language identifier included in every batch payload.
@@ -75,9 +75,15 @@ export function resolveConfig(config: NodeLoomConfig): ResolvedConfig {
     throw new Error("NodeLoom SDK: apiKey is required");
   }
 
+  const endpoint = (config.endpoint ?? DEFAULT_ENDPOINT).replace(/\/+$/, "");
+
+  if (endpoint && !endpoint.startsWith("https://") && !endpoint.includes("localhost") && !endpoint.includes("127.0.0.1")) {
+    console.warn(`[nodeloom] WARNING: Endpoint '${endpoint}' does not use HTTPS. API keys will be sent in plaintext.`);
+  }
+
   return {
     apiKey: config.apiKey,
-    endpoint: (config.endpoint ?? DEFAULT_ENDPOINT).replace(/\/+$/, ""),
+    endpoint,
     maxBatchSize: config.maxBatchSize ?? DEFAULT_MAX_BATCH_SIZE,
     flushIntervalMs: config.flushIntervalMs ?? DEFAULT_FLUSH_INTERVAL_MS,
     maxQueueSize: config.maxQueueSize ?? DEFAULT_MAX_QUEUE_SIZE,

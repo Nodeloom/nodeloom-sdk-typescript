@@ -1,6 +1,6 @@
 {
   "name": "@nodeloom/sdk",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "NodeLoom SDK for AI agent telemetry and monitoring",
   "type": "module",
   "main": "./dist/cjs/index.cjs",
