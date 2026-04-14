@@ -1,6 +1,6 @@
 {
   "name": "@nodeloom/sdk",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "NodeLoom SDK for AI agent telemetry and monitoring",
   "type": "module",
   "main": "./dist/cjs/index.cjs",
@@ -26,6 +26,16 @@
         "types": "./dist/cjs/integrations/langchain.d.cts",
         "default": "./dist/cjs/integrations/langchain.cjs"
       }
+    },
+    "./integrations/anthropic": {
+      "import": {
+        "types": "./dist/esm/integrations/anthropic.d.ts",
+        "default": "./dist/esm/integrations/anthropic.js"
+      },
+      "require": {
+        "types": "./dist/cjs/integrations/anthropic.d.cts",
+        "default": "./dist/cjs/integrations/anthropic.cjs"
+      }
     }
   },
   "files": [
@@ -47,10 +57,14 @@
     "node": ">=20"
   },
   "peerDependencies": {
-    "@langchain/core": ">=0.1.0"
+    "@langchain/core": ">=0.1.0",
+    "@anthropic-ai/sdk": ">= 1.0.0"
   },
   "peerDependenciesMeta": {
     "@langchain/core": {
+      "optional": true
+    },
+    "@anthropic-ai/sdk": {
       "optional": true
     }
   },
