@@ -147,7 +147,14 @@ export class ApiClient {
 
   // ── Guardrail Operations ────────────────────────────────────
 
-  /** Run guardrail checks on text content. */
+  /**
+   * Run guardrail checks on text content.
+   *
+   * @param teamId - Team UUID. Pass empty string for SDK-token callers — the
+   *     backend infers the team from the token. Required for session-auth.
+   * @param text - Text to evaluate.
+   * @param options - Check configuration (detectors, agentName, etc.).
+   */
   async checkGuardrails(
     teamId: string,
     text: string,
@@ -184,6 +191,8 @@ export class ApiClient {
     }>;
     guardrailSessionId?: string | null;
   }> {
+    // SDK-token callers can pass empty teamId; the backend infers from the token.
+    const params: Record<string, string | number> | undefined = teamId ? { teamId } : undefined;
     const response = await this.request<{
       passed: boolean;
       violations: Array<{
@@ -204,7 +213,7 @@ export class ApiClient {
       guardrailSessionId?: string | null;
     }>("/api/guardrails/check", {
       method: "POST",
-      params: { teamId },
+      params,
       body: { text, ...options },
     });
 
@@ -218,6 +227,7 @@ export class ApiClient {
     }
     return response;
   }
+
 
   // ── Feedback Operations ────────────────────────────────────
 

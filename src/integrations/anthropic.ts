@@ -100,7 +100,11 @@ export class ManagedAgentsHandler {
               lastOutput = { text };
               if (self.guardrails) {
                 self.client.api
-                  .checkGuardrails("", text, { redactPii: true, filterContent: true })
+                  .checkGuardrails("", text, {
+                    redactPii: true,
+                    filterContent: true,
+                    agentName: self.agentName,
+                  })
                   .then((result: GuardrailResult) => {
                     if (!result.passed) {
                       self.client.event("guardrail_violation", "warn", {
@@ -156,6 +160,7 @@ export class ManagedAgentsHandler {
         return self.client.api.checkGuardrails("", text, {
           detectPromptInjection: true,
           redactPii: true,
+          agentName: self.agentName,
         });
       },
 
@@ -164,6 +169,7 @@ export class ManagedAgentsHandler {
         return self.client.api.checkGuardrails("", text, {
           redactPii: true,
           filterContent: true,
+          agentName: self.agentName,
         });
       },
 

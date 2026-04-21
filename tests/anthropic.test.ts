@@ -107,6 +107,7 @@ describe("SessionContext", () => {
     expect(client.api.checkGuardrails).toHaveBeenCalledWith("", "test input", {
       detectPromptInjection: true,
       redactPii: true,
+      agentName: "test",
     });
   });
 
