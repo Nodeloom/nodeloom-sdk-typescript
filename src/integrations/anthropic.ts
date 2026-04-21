@@ -24,6 +24,7 @@
 import { NodeLoomClient } from "../client";
 import { Trace } from "../trace";
 import { Span } from "../span";
+import { SpanType, Status } from "../types";
 
 export interface ManagedAgentsHandlerOptions {
   guardrails?: boolean;
@@ -35,7 +36,7 @@ export interface SessionContext {
   onEvent: (event: AnthropicEvent) => void;
   checkInput: (text: string) => Promise<GuardrailResult>;
   checkOutput: (text: string) => Promise<GuardrailResult>;
-  end: (status?: string) => void;
+  end: (status?: Status) => void;
 }
 
 export interface AnthropicEvent {
@@ -56,8 +57,8 @@ export interface GuardrailResult {
 export class ManagedAgentsHandler {
   private client: NodeLoomClient;
   private agentName: string;
-  private agentVersion?: string;
   private guardrails: boolean;
+  private options?: ManagedAgentsHandlerOptions;
 
   constructor(
     client: NodeLoomClient,
@@ -67,16 +68,18 @@ export class ManagedAgentsHandler {
     this.client = client;
     this.agentName = agentName;
     this.guardrails = options?.guardrails !== false;
-    this.agentVersion = options?.agentVersion;
+    this.options = options;
   }
 
   /**
    * Create a session context that auto-instruments Anthropic events.
    */
   traceSession(sessionId: string): SessionContext {
-    const trace = this.client.trace(this.agentName, {
-      sessionId,
-    });
+    const traceOptions: Record<string, unknown> = { sessionId };
+    if (this.options?.agentVersion) {
+      traceOptions.agentVersion = this.options.agentVersion;
+    }
+    const trace = this.client.trace(this.agentName, traceOptions);
 
     const activeSpans = new Map<string, Span>();
     let lastOutput: Record<string, unknown> | undefined;
@@ -91,16 +94,16 @@ export class ManagedAgentsHandler {
         switch (event.type) {
           case "agent.message": {
             const text = extractText(event);
-            const span = trace.span("llm-response", { spanType: "llm" });
+            const span = trace.span("llm-response", SpanType.LLM);
             if (text) {
               span.setOutput({ text });
               lastOutput = { text };
               if (self.guardrails) {
                 self.client.api
-                  .checkGuardrails({ text, redactPii: true, filterContent: true })
+                  .checkGuardrails("", text, { redactPii: true, filterContent: true })
                   .then((result: GuardrailResult) => {
                     if (!result.passed) {
-                      self.client.event("guardrail_violation", {
+                      self.client.event("guardrail_violation", "warn", {
                         source: "anthropic-managed-agents",
                         direction: "output",
                         violations: result.violations,
@@ -110,18 +113,18 @@ export class ManagedAgentsHandler {
                   .catch(() => {});
               }
             }
-            span.end();
+            span.end("success");
             break;
           }
 
           case "agent.tool_use": {
             const name = event.name || "tool";
-            const span = trace.span(name, { spanType: "tool" });
+            const span = trace.span(name, SpanType.Tool);
             if (event.input) span.setInput(event.input);
             if (event.id) {
               activeSpans.set(event.id, span);
             } else {
-              span.end();
+              span.end("success");
             }
             break;
           }
@@ -132,7 +135,7 @@ export class ManagedAgentsHandler {
               const span = activeSpans.get(toolId)!;
               const text = extractText(event);
               if (text) span.setOutput({ result: text });
-              span.end();
+              span.end("success");
               activeSpans.delete(toolId);
             }
             break;
@@ -140,9 +143,9 @@ export class ManagedAgentsHandler {
 
           case "agent.thinking": {
             const text = extractText(event);
-            const span = trace.span("thinking", { spanType: "custom" });
+            const span = trace.span("thinking", SpanType.Custom);
             if (text) span.setInput({ thinking: text });
-            span.end();
+            span.end("success");
             break;
           }
         }
@@ -150,8 +153,7 @@ export class ManagedAgentsHandler {
 
       async checkInput(text: string): Promise<GuardrailResult> {
         if (!self.guardrails) return { passed: true, violations: [] };
-        return self.client.api.checkGuardrails({
-          text,
+        return self.client.api.checkGuardrails("", text, {
           detectPromptInjection: true,
           redactPii: true,
         });
@@ -159,20 +161,18 @@ export class ManagedAgentsHandler {
 
       async checkOutput(text: string): Promise<GuardrailResult> {
         if (!self.guardrails) return { passed: true, violations: [] };
-        return self.client.api.checkGuardrails({
-          text,
+        return self.client.api.checkGuardrails("", text, {
           redactPii: true,
           filterContent: true,
         });
       },
 
-      end(status?: string): void {
-        // End any remaining active spans
+      end(status?: Status): void {
         for (const span of activeSpans.values()) {
-          span.end();
+          span.end("success");
         }
         activeSpans.clear();
-        trace.end({ status: status || "success", output: lastOutput });
+        trace.end(status || "success", { output: lastOutput });
       },
     };
   }

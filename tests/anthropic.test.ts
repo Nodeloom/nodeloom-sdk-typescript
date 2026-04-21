@@ -51,7 +51,7 @@ describe("SessionContext", () => {
 
     ctx.onEvent({ type: "agent.message", content: [{ text: "Hello!" }] });
 
-    expect(trace.span).toHaveBeenCalledWith("llm-response", { spanType: "llm" });
+    expect(trace.span).toHaveBeenCalledWith("llm-response", "llm");
     expect(span.setOutput).toHaveBeenCalledWith({ text: "Hello!" });
     expect(span.end).toHaveBeenCalled();
   });
@@ -63,7 +63,7 @@ describe("SessionContext", () => {
 
     ctx.onEvent({ type: "agent.tool_use", name: "bash", input: { command: "ls" } });
 
-    expect(trace.span).toHaveBeenCalledWith("bash", { spanType: "tool" });
+    expect(trace.span).toHaveBeenCalledWith("bash", "tool");
     expect(span.setInput).toHaveBeenCalledWith({ command: "ls" });
   });
 
@@ -74,7 +74,7 @@ describe("SessionContext", () => {
 
     ctx.onEvent({ type: "agent.thinking", content: [{ text: "Let me think..." }] });
 
-    expect(trace.span).toHaveBeenCalledWith("thinking", { spanType: "custom" });
+    expect(trace.span).toHaveBeenCalledWith("thinking", "custom");
   });
 
   it("ignores unknown event types", () => {
@@ -94,7 +94,7 @@ describe("SessionContext", () => {
 
     ctx.end();
 
-    expect(trace.end).toHaveBeenCalledWith({ status: "success", output: undefined });
+    expect(trace.end).toHaveBeenCalledWith("success", { output: undefined });
   });
 
   it("checks input guardrails", async () => {
@@ -104,8 +104,7 @@ describe("SessionContext", () => {
 
     await ctx.checkInput("test input");
 
-    expect(client.api.checkGuardrails).toHaveBeenCalledWith({
-      text: "test input",
+    expect(client.api.checkGuardrails).toHaveBeenCalledWith("", "test input", {
       detectPromptInjection: true,
       redactPii: true,
     });
