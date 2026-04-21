@@ -32,15 +32,18 @@ export class ApiClient {
   private readonly endpoint: string;
   private readonly apiKey: string;
   private readonly controlRegistry: ControlRegistry | null;
+  private readonly requestTimeoutMs: number;
 
   constructor(
     apiKey: string,
     endpoint: string = "https://api.nodeloom.io",
     controlRegistry: ControlRegistry | null = null,
+    requestTimeoutMs: number = 30_000,
   ) {
     this.apiKey = apiKey;
     this.endpoint = endpoint.replace(/\/+$/, "");
     this.controlRegistry = controlRegistry;
+    this.requestTimeoutMs = requestTimeoutMs;
   }
 
   /**
@@ -70,6 +73,7 @@ export class ApiClient {
         Authorization: `Bearer ${this.apiKey}`,
       },
       body: body ? JSON.stringify(body) : undefined,
+      signal: AbortSignal.timeout(this.requestTimeoutMs),
     });
 
     if (!response.ok) {

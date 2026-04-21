@@ -106,7 +106,12 @@ export class NodeLoomClient {
    */
   get api(): ApiClient {
     if (!this._api) {
-      this._api = new ApiClient(this.config.apiKey, this.config.endpoint, this.controlRegistry);
+      this._api = new ApiClient(
+        this.config.apiKey,
+        this.config.endpoint,
+        this.controlRegistry,
+        this.config.requestTimeoutMs,
+      );
     }
     return this._api;
   }

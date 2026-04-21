@@ -83,7 +83,7 @@ export class Transport {
           "User-Agent": `nodeloom-sdk-typescript/${payload.sdk_version}`,
         },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(this.config.requestTimeoutMs),
       });
 
       if (response.ok) {

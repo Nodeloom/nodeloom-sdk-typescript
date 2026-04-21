@@ -48,6 +48,13 @@ export interface NodeLoomConfig {
    * useful for sparse-traffic agents. Set to 0 to disable.
    */
   controlPollIntervalMs?: number;
+
+  /**
+   * Per-request HTTP timeout in milliseconds. Applies to both telemetry
+   * batches and control/guardrail calls. Lower values fail fast when the
+   * backend is unreachable; higher values tolerate slow networks.
+   */
+  requestTimeoutMs?: number;
 }
 
 /**
@@ -65,6 +72,7 @@ export interface ResolvedConfig {
   silent: boolean;
   disabled: boolean;
   controlPollIntervalMs: number;
+  requestTimeoutMs: number;
 }
 
 const DEFAULT_ENDPOINT = "https://api.nodeloom.io";
@@ -75,6 +83,7 @@ const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_RETRY_BASE_DELAY_MS = 1_000;
 const DEFAULT_ENVIRONMENT = "production";
 const DEFAULT_CONTROL_POLL_INTERVAL_MS = 60_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
 /**
  * Merges user-provided configuration with defaults to produce a fully resolved config.
@@ -102,5 +111,6 @@ export function resolveConfig(config: NodeLoomConfig): ResolvedConfig {
     silent: config.silent ?? false,
     disabled: config.disabled ?? false,
     controlPollIntervalMs: config.controlPollIntervalMs ?? DEFAULT_CONTROL_POLL_INTERVAL_MS,
+    requestTimeoutMs: config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
   };
 }
