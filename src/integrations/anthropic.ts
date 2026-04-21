@@ -114,7 +114,10 @@ export class ManagedAgentsHandler {
                       });
                     }
                   })
-                  .catch(() => {});
+                  .catch((err: unknown) => {
+                    const msg = err instanceof Error ? err.message : String(err);
+                    console.warn(`NodeLoom SDK: Anthropic guardrail output check failed: ${msg}`);
+                  });
               }
             }
             span.end("success");

@@ -121,4 +121,29 @@ describe("SessionContext", () => {
     expect(result.passed).toBe(true);
     expect(client.api.checkGuardrails).not.toHaveBeenCalled();
   });
+
+  it("logs and continues when background guardrail check rejects", async () => {
+    // A rejected checkGuardrails promise during agent.message handling must
+    // never propagate up to crash the event stream, but must also not be
+    // swallowed silently — operators need the signal to diagnose outages.
+    const { client, span } = makeClient();
+    client.api.checkGuardrails.mockRejectedValueOnce(new Error("backend 503"));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const handler = new ManagedAgentsHandler(client, "test");
+      const ctx = handler.traceSession("sess_fail");
+
+      ctx.onEvent({ type: "agent.message", content: [{ text: "hello" }] });
+
+      // Let the background promise settle.
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(span.end).toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Anthropic guardrail output check failed"),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
 });
