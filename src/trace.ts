@@ -1,5 +1,6 @@
 import type { BatchProcessor } from "./batch-processor.js";
 import type { ResolvedConfig } from "./config.js";
+import { type ControlRegistry, raiseIfHalted } from "./control.js";
 import { Span } from "./span.js";
 import type {
   SpanOptions,
@@ -40,8 +41,15 @@ export class Trace {
     processor: BatchProcessor,
     config: ResolvedConfig,
     options?: TraceOptions,
-    framework?: { name: string; version: string | undefined } | null
+    framework?: { name: string; version: string | undefined } | null,
+    controlRegistry?: ControlRegistry | null,
   ) {
+    // Fail fast on halted agents BEFORE allocating any state, so callers see
+    // AgentHaltedError as a synchronous, no-side-effect throw.
+    if (controlRegistry) {
+      raiseIfHalted(controlRegistry, agentName);
+    }
+
     this.id = crypto.randomUUID();
     this.agentName = agentName;
     this.timestamp = new Date().toISOString();
@@ -84,6 +92,13 @@ export class Trace {
       }
     }
     startEvent.sdk_language = "typescript";
+
+    if (controlRegistry) {
+      const sessionId = controlRegistry.takeGuardrailSession(agentName);
+      if (sessionId) {
+        startEvent.guardrail_session_id = sessionId;
+      }
+    }
 
     this.processor.enqueue(startEvent);
   }

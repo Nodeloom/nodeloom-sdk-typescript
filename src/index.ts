@@ -40,6 +40,14 @@ export { NodeLoomClient } from "./client.js";
 export { ApiClient, ApiError } from "./api.js";
 export type { ApiRequestOptions } from "./api.js";
 
+// Remote control (kill switch + required guardrails)
+export {
+  AgentHaltedError,
+  ControlRegistry,
+  type AgentControlPayload,
+  type AgentControlState,
+} from "./control.js";
+
 // Trace and span
 export { Trace } from "./trace.js";
 export { Span } from "./span.js";

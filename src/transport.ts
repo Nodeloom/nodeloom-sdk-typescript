@@ -3,12 +3,17 @@ import type { BatchPayload } from "./types.js";
 
 /**
  * Result of a transport send attempt.
+ *
+ * `body` carries the parsed JSON response on success so the caller can pull
+ * out the agent control payload for the kill-switch / require-guardrails
+ * machinery without making a second round-trip.
  */
 export interface TransportResult {
   success: boolean;
   statusCode?: number;
   error?: string;
   retryable: boolean;
+  body?: unknown;
 }
 
 /**
@@ -28,9 +33,10 @@ export class Transport {
 
   /**
    * Sends a batch payload to the telemetry endpoint with retry logic.
-   * Returns true if the batch was accepted (2xx), false otherwise.
+   * Returns the {@link TransportResult} so callers can pull the parsed
+   * body out (in particular, the agent control payload).
    */
-  async send(payload: BatchPayload): Promise<boolean> {
+  async send(payload: BatchPayload): Promise<TransportResult> {
     let lastResult: TransportResult | undefined;
 
     for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
@@ -42,7 +48,7 @@ export class Transport {
       lastResult = await this.attemptSend(payload);
 
       if (lastResult.success) {
-        return true;
+        return lastResult;
       }
 
       if (!lastResult.retryable) {
@@ -51,7 +57,7 @@ export class Transport {
             `NodeLoom SDK: non-retryable error (status ${lastResult.statusCode}): ${lastResult.error ?? "unknown"}`
           );
         }
-        return false;
+        return lastResult;
       }
     }
 
@@ -61,7 +67,7 @@ export class Transport {
       );
     }
 
-    return false;
+    return lastResult ?? { success: false, retryable: false, error: "unknown" };
   }
 
   /**
@@ -81,7 +87,13 @@ export class Transport {
       });
 
       if (response.ok) {
-        return { success: true, statusCode: response.status, retryable: false };
+        let body: unknown;
+        try {
+          body = await response.json();
+        } catch {
+          body = undefined;
+        }
+        return { success: true, statusCode: response.status, retryable: false, body };
       }
 
       const retryable = this.isRetryableStatus(response.status);

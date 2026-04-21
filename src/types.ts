@@ -55,6 +55,12 @@ export interface TraceStartEvent {
   framework?: string;
   framework_version?: string;
   sdk_language?: string;
+  /**
+   * Phase 2: short-lived session id returned by check_guardrails. Allows
+   * HARD-mode required-guardrail enforcement on the backend to verify a
+   * recent guardrail check exists for the agent.
+   */
+  guardrail_session_id?: string;
   timestamp: string;
 }
 

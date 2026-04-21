@@ -1,7 +1,7 @@
 /**
  * SDK version string, kept in sync with package.json.
  */
-export const SDK_VERSION = "0.7.0";
+export const SDK_VERSION = "0.10.0";
 
 /**
  * Language identifier included in every batch payload.
@@ -41,6 +41,13 @@ export interface NodeLoomConfig {
 
   /** If true, the SDK is disabled and no events are sent. Useful for local dev. */
   disabled?: boolean;
+
+  /**
+   * Interval in milliseconds between standalone control polls. Telemetry batch
+   * responses already piggy-back the control payload, so polling is mainly
+   * useful for sparse-traffic agents. Set to 0 to disable.
+   */
+  controlPollIntervalMs?: number;
 }
 
 /**
@@ -57,6 +64,7 @@ export interface ResolvedConfig {
   environment: string;
   silent: boolean;
   disabled: boolean;
+  controlPollIntervalMs: number;
 }
 
 const DEFAULT_ENDPOINT = "https://api.nodeloom.io";
@@ -66,6 +74,7 @@ const DEFAULT_MAX_QUEUE_SIZE = 10_000;
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_RETRY_BASE_DELAY_MS = 1_000;
 const DEFAULT_ENVIRONMENT = "production";
+const DEFAULT_CONTROL_POLL_INTERVAL_MS = 60_000;
 
 /**
  * Merges user-provided configuration with defaults to produce a fully resolved config.
@@ -92,5 +101,6 @@ export function resolveConfig(config: NodeLoomConfig): ResolvedConfig {
     environment: config.environment ?? DEFAULT_ENVIRONMENT,
     silent: config.silent ?? false,
     disabled: config.disabled ?? false,
+    controlPollIntervalMs: config.controlPollIntervalMs ?? DEFAULT_CONTROL_POLL_INTERVAL_MS,
   };
 }

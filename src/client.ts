@@ -1,6 +1,8 @@
 import { ApiClient } from "./api.js";
 import { BatchProcessor } from "./batch-processor.js";
 import { type NodeLoomConfig, resolveConfig, type ResolvedConfig } from "./config.js";
+import { ControlRegistry } from "./control.js";
+import { ControlPoller } from "./control-poller.js";
 import { Trace } from "./trace.js";
 import type {
   EventLevel,
@@ -32,17 +34,31 @@ import type {
 export class NodeLoomClient {
   private readonly config: ResolvedConfig;
   private readonly processor: BatchProcessor;
+  private readonly controlRegistry: ControlRegistry;
+  private readonly poller: ControlPoller | null;
   private _api: ApiClient | null = null;
   private isShutdown = false;
   private readonly detectedFramework: { name: string; version: string | undefined } | null;
 
   constructor(config: NodeLoomConfig) {
     this.config = resolveConfig(config);
-    this.processor = new BatchProcessor(this.config);
+    this.controlRegistry = new ControlRegistry();
+    this.processor = new BatchProcessor(this.config, this.controlRegistry);
     this.detectedFramework = NodeLoomClient.detectFramework();
 
     if (!this.config.disabled) {
       this.processor.start();
+    }
+
+    if (!this.config.disabled && this.config.controlPollIntervalMs > 0) {
+      this.poller = new ControlPoller(
+        this.controlRegistry,
+        () => this.api,
+        this.config.controlPollIntervalMs,
+      );
+      this.poller.start();
+    } else {
+      this.poller = null;
     }
   }
 
@@ -90,7 +106,7 @@ export class NodeLoomClient {
    */
   get api(): ApiClient {
     if (!this._api) {
-      this._api = new ApiClient(this.config.apiKey, this.config.endpoint);
+      this._api = new ApiClient(this.config.apiKey, this.config.endpoint, this.controlRegistry);
     }
     return this._api;
   }
@@ -113,7 +129,23 @@ export class NodeLoomClient {
       );
     }
 
-    return new Trace(agentName, this.processor, this.config, options, this.detectedFramework);
+    return new Trace(
+      agentName,
+      this.processor,
+      this.config,
+      options,
+      this.detectedFramework,
+      this.controlRegistry,
+    );
+  }
+
+  /**
+   * Direct accessor to the control registry. Useful for tests or custom
+   * control workflows; production callers should rely on the implicit
+   * halt-detection inside {@link trace}.
+   */
+  get control(): ControlRegistry {
+    return this.controlRegistry;
   }
 
   /**
@@ -213,6 +245,9 @@ export class NodeLoomClient {
     }
 
     this.isShutdown = true;
+    if (this.poller) {
+      this.poller.stop();
+    }
     await this.processor.shutdown();
   }
 

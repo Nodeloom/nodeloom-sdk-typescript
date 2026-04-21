@@ -105,7 +105,7 @@ describe("BatchProcessor", () => {
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.events).toHaveLength(2);
-      expect(body.sdk_version).toBe("0.7.0");
+      expect(body.sdk_version).toBe("0.10.0");
       expect(body.sdk_language).toBe("typescript");
     });
 
@@ -420,7 +420,7 @@ describe("BatchProcessor", () => {
       expect(init.headers["Content-Type"]).toBe("application/json");
       expect(init.headers["Authorization"]).toBe("Bearer sdk_test");
       expect(init.headers["User-Agent"]).toBe(
-        "nodeloom-sdk-typescript/0.7.0"
+        "nodeloom-sdk-typescript/0.10.0"
       );
     });
 

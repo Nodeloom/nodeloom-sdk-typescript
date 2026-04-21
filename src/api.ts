@@ -5,6 +5,8 @@
  * This module provides a typed client for common operations.
  */
 
+import type { AgentControlPayload, ControlRegistry } from "./control.js";
+
 export interface ApiRequestOptions {
   method?: string;
   body?: unknown;
@@ -29,10 +31,16 @@ export class ApiError extends Error {
 export class ApiClient {
   private readonly endpoint: string;
   private readonly apiKey: string;
+  private readonly controlRegistry: ControlRegistry | null;
 
-  constructor(apiKey: string, endpoint: string = "https://api.nodeloom.io") {
+  constructor(
+    apiKey: string,
+    endpoint: string = "https://api.nodeloom.io",
+    controlRegistry: ControlRegistry | null = null,
+  ) {
     this.apiKey = apiKey;
     this.endpoint = endpoint.replace(/\/+$/, "");
+    this.controlRegistry = controlRegistry;
   }
 
   /**
@@ -150,6 +158,11 @@ export class ApiClient {
       applyCustomRules?: boolean;
       detectSemanticManipulation?: boolean;
       onViolation?: "BLOCKED" | "WARNED" | "LOGGED";
+      /**
+       * SDK agent name. Required to mint a guardrail session id (Phase 2)
+       * and to dispatch incident playbooks on violations.
+       */
+      agentName?: string;
       [key: string]: unknown;
     } = {},
   ): Promise<{
@@ -169,12 +182,41 @@ export class ApiClient {
       violationsFound: number;
       durationMs: number;
     }>;
+    guardrailSessionId?: string | null;
   }> {
-    return this.request("/api/guardrails/check", {
+    const response = await this.request<{
+      passed: boolean;
+      violations: Array<{
+        type: string;
+        severity: string;
+        action: string;
+        message: string;
+        confidence: number;
+        details: Record<string, unknown>;
+      }>;
+      redactedContent: string;
+      checks: Array<{
+        type: string;
+        passed: boolean;
+        violationsFound: number;
+        durationMs: number;
+      }>;
+      guardrailSessionId?: string | null;
+    }>("/api/guardrails/check", {
       method: "POST",
       params: { teamId },
       body: { text, ...options },
     });
+
+    if (this.controlRegistry && options.agentName && response?.guardrailSessionId) {
+      const cached = this.controlRegistry.get(options.agentName);
+      this.controlRegistry.recordGuardrailSession(
+        options.agentName,
+        response.guardrailSessionId,
+        cached.guardrailSessionTtlSeconds || 300,
+      );
+    }
+    return response;
   }
 
   // ── Feedback Operations ────────────────────────────────────
@@ -289,6 +331,23 @@ export class ApiClient {
   /** Get the current guardrail configuration (read-only). Configure via NodeLoom UI. */
   async getGuardrailConfig(agentName: string): Promise<unknown> {
     return this.request(`/api/sdk/v1/agents/${agentName}/guardrails`);
+  }
+
+  // ── Remote Control (kill switch) ──────────────────────────────
+
+  /**
+   * Fetch the current remote-control payload for an agent. When the client was
+   * built with a {@link ControlRegistry}, the response is also merged into the
+   * registry so subsequent traces immediately observe the latest halt state.
+   */
+  async getAgentControl(agentName: string): Promise<AgentControlPayload> {
+    const response = await this.request<AgentControlPayload>(
+      `/api/sdk/v1/agents/${agentName}/control`,
+    );
+    if (this.controlRegistry) {
+      this.controlRegistry.updateFromPayload(response);
+    }
+    return response;
   }
 
   // ── Metrics Operations ───────────────────────────────────
