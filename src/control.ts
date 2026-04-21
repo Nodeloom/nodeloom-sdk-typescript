@@ -112,19 +112,17 @@ export class ControlRegistry {
     const haltSource = payload.halt_source ?? "none";
     const haltReason = payload.halt_reason ?? null;
     const requireGuardrails = (payload.require_guardrails ?? "OFF").toUpperCase();
-    const ttl = Number(payload.guardrail_session_ttl_seconds ?? 300);
+    // Clamp TTL to a sane range (1s–24h). Protects against a buggy server.
+    const rawTtl = Number(payload.guardrail_session_ttl_seconds ?? 300);
+    const ttl = Number.isFinite(rawTtl) && rawTtl >= 1 && rawTtl <= 86_400 ? rawTtl : 300;
 
-    if (haltSource === "team") {
-      if (revision >= this.teamRevision) {
-        this.teamHalted = halted;
-        this.teamHaltReason = haltReason;
-        this.teamRevision = revision;
-      }
-    } else if (!halted && revision >= this.teamRevision) {
-      // An agent-source payload that isn't halted implicitly clears the
-      // team-wide flag, but only if the revision is fresh.
-      this.teamHalted = false;
-      this.teamHaltReason = null;
+    // Team-wide flag is only mutated by team-source payloads with fresh
+    // revisions. Agent-source payloads never touch team state — otherwise a
+    // late piggy-backed agent response could clobber a team halt issued after it.
+    if (haltSource === "team" && revision >= this.teamRevision) {
+      this.teamHalted = halted;
+      this.teamHaltReason = haltReason;
+      this.teamRevision = revision;
     }
 
     const agentName = payload.agent_name ?? null;

@@ -93,6 +93,50 @@ describe("ControlRegistry", () => {
     registry.recordGuardrailSession("agent-1", "sess-abc", 5, now);
     expect(registry.takeGuardrailSession("agent-1", now + 6_000)).toBeNull();
   });
+
+  it("clamps a nonsensical TTL from the backend to the default", () => {
+    const registry = new ControlRegistry();
+    registry.updateFromPayload({
+      agent_name: "agent-1",
+      halted: false,
+      halt_source: "none",
+      revision: 1,
+      require_guardrails: "OFF",
+      guardrail_session_ttl_seconds: -5,
+    });
+    expect(registry.get("agent-1").guardrailSessionTtlSeconds).toBe(300);
+
+    registry.updateFromPayload({
+      agent_name: "agent-1",
+      halted: false,
+      halt_source: "none",
+      revision: 2,
+      require_guardrails: "OFF",
+      guardrail_session_ttl_seconds: 1e12,
+    });
+    expect(registry.get("agent-1").guardrailSessionTtlSeconds).toBe(300);
+  });
+
+  it("does not let an agent-source payload clear a team halt", () => {
+    const registry = new ControlRegistry();
+    registry.updateFromPayload({
+      agent_name: "agent-1",
+      halted: true,
+      halt_source: "team",
+      halt_reason: "incident",
+      revision: 1_000_000,
+      require_guardrails: "OFF",
+    });
+    registry.updateFromPayload({
+      agent_name: "agent-1",
+      halted: false,
+      halt_source: "agent",
+      revision: 2_000_000, // higher, but agent-source must not touch team flag
+      require_guardrails: "OFF",
+    });
+    expect(registry.get("agent-1").halted).toBe(true);
+    expect(registry.get("agent-1").haltSource).toBe("team");
+  });
 });
 
 describe("NodeLoomClient.trace halt enforcement", () => {
