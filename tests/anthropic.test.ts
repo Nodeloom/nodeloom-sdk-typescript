@@ -51,7 +51,7 @@ describe("SessionContext", () => {
 
     ctx.onEvent({ type: "agent.message", content: [{ text: "Hello!" }] });
 
-    expect(trace.span).toHaveBeenCalledWith("llm-response", { spanType: "llm" });
+    expect(trace.span).toHaveBeenCalledWith("llm-response", "llm");
     expect(span.setOutput).toHaveBeenCalledWith({ text: "Hello!" });
     expect(span.end).toHaveBeenCalled();
   });
@@ -63,7 +63,7 @@ describe("SessionContext", () => {
 
     ctx.onEvent({ type: "agent.tool_use", name: "bash", input: { command: "ls" } });
 
-    expect(trace.span).toHaveBeenCalledWith("bash", { spanType: "tool" });
+    expect(trace.span).toHaveBeenCalledWith("bash", "tool");
     expect(span.setInput).toHaveBeenCalledWith({ command: "ls" });
   });
 
@@ -74,7 +74,7 @@ describe("SessionContext", () => {
 
     ctx.onEvent({ type: "agent.thinking", content: [{ text: "Let me think..." }] });
 
-    expect(trace.span).toHaveBeenCalledWith("thinking", { spanType: "custom" });
+    expect(trace.span).toHaveBeenCalledWith("thinking", "custom");
   });
 
   it("ignores unknown event types", () => {
@@ -94,7 +94,7 @@ describe("SessionContext", () => {
 
     ctx.end();
 
-    expect(trace.end).toHaveBeenCalledWith({ status: "success", output: undefined });
+    expect(trace.end).toHaveBeenCalledWith("success", { output: undefined });
   });
 
   it("checks input guardrails", async () => {
@@ -104,10 +104,10 @@ describe("SessionContext", () => {
 
     await ctx.checkInput("test input");
 
-    expect(client.api.checkGuardrails).toHaveBeenCalledWith({
-      text: "test input",
+    expect(client.api.checkGuardrails).toHaveBeenCalledWith("", "test input", {
       detectPromptInjection: true,
       redactPii: true,
+      agentName: "test",
     });
   });
 
@@ -120,5 +120,30 @@ describe("SessionContext", () => {
 
     expect(result.passed).toBe(true);
     expect(client.api.checkGuardrails).not.toHaveBeenCalled();
+  });
+
+  it("logs and continues when background guardrail check rejects", async () => {
+    // A rejected checkGuardrails promise during agent.message handling must
+    // never propagate up to crash the event stream, but must also not be
+    // swallowed silently — operators need the signal to diagnose outages.
+    const { client, span } = makeClient();
+    client.api.checkGuardrails.mockRejectedValueOnce(new Error("backend 503"));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const handler = new ManagedAgentsHandler(client, "test");
+      const ctx = handler.traceSession("sess_fail");
+
+      ctx.onEvent({ type: "agent.message", content: [{ text: "hello" }] });
+
+      // Let the background promise settle.
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(span.end).toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Anthropic guardrail output check failed"),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });

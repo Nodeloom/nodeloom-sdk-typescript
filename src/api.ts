@@ -5,6 +5,18 @@
  * This module provides a typed client for common operations.
  */
 
+import type { AgentControlPayload, ControlRegistry } from "./control.js";
+
+// Trailing-slash stripping via a linear scan. The regex /\/+$/ would work
+// but CodeQL's polynomial-ReDoS check flags it (endpoint is technically a
+// string input to the function). A single-pass slice is equivalent and
+// avoids the static-analysis noise.
+function stripTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s.charCodeAt(end - 1) === 47 /* '/' */) end--;
+  return end === s.length ? s : s.slice(0, end);
+}
+
 export interface ApiRequestOptions {
   method?: string;
   body?: unknown;
@@ -29,10 +41,19 @@ export class ApiError extends Error {
 export class ApiClient {
   private readonly endpoint: string;
   private readonly apiKey: string;
+  private readonly controlRegistry: ControlRegistry | null;
+  private readonly requestTimeoutMs: number;
 
-  constructor(apiKey: string, endpoint: string = "https://api.nodeloom.io") {
+  constructor(
+    apiKey: string,
+    endpoint: string = "https://api.nodeloom.io",
+    controlRegistry: ControlRegistry | null = null,
+    requestTimeoutMs: number = 30_000,
+  ) {
     this.apiKey = apiKey;
-    this.endpoint = endpoint.replace(/\/+$/, "");
+    this.endpoint = stripTrailingSlashes(endpoint);
+    this.controlRegistry = controlRegistry;
+    this.requestTimeoutMs = requestTimeoutMs;
   }
 
   /**
@@ -62,6 +83,7 @@ export class ApiClient {
         Authorization: `Bearer ${this.apiKey}`,
       },
       body: body ? JSON.stringify(body) : undefined,
+      signal: AbortSignal.timeout(this.requestTimeoutMs),
     });
 
     if (!response.ok) {
@@ -139,7 +161,14 @@ export class ApiClient {
 
   // ── Guardrail Operations ────────────────────────────────────
 
-  /** Run guardrail checks on text content. */
+  /**
+   * Run guardrail checks on text content.
+   *
+   * @param teamId - Team UUID. Pass empty string for SDK-token callers — the
+   *     backend infers the team from the token. Required for session-auth.
+   * @param text - Text to evaluate.
+   * @param options - Check configuration (detectors, agentName, etc.).
+   */
   async checkGuardrails(
     teamId: string,
     text: string,
@@ -150,6 +179,11 @@ export class ApiClient {
       applyCustomRules?: boolean;
       detectSemanticManipulation?: boolean;
       onViolation?: "BLOCKED" | "WARNED" | "LOGGED";
+      /**
+       * SDK agent name. Required to mint a guardrail session id (Phase 2)
+       * and to dispatch incident playbooks on violations.
+       */
+      agentName?: string;
       [key: string]: unknown;
     } = {},
   ): Promise<{
@@ -169,13 +203,45 @@ export class ApiClient {
       violationsFound: number;
       durationMs: number;
     }>;
+    guardrailSessionId?: string | null;
   }> {
-    return this.request("/api/guardrails/check", {
+    // SDK-token callers can pass empty teamId; the backend infers from the token.
+    const params: Record<string, string | number> | undefined = teamId ? { teamId } : undefined;
+    const response = await this.request<{
+      passed: boolean;
+      violations: Array<{
+        type: string;
+        severity: string;
+        action: string;
+        message: string;
+        confidence: number;
+        details: Record<string, unknown>;
+      }>;
+      redactedContent: string;
+      checks: Array<{
+        type: string;
+        passed: boolean;
+        violationsFound: number;
+        durationMs: number;
+      }>;
+      guardrailSessionId?: string | null;
+    }>("/api/guardrails/check", {
       method: "POST",
-      params: { teamId },
+      params,
       body: { text, ...options },
     });
+
+    if (this.controlRegistry && options.agentName && response?.guardrailSessionId) {
+      const cached = this.controlRegistry.get(options.agentName);
+      this.controlRegistry.recordGuardrailSession(
+        options.agentName,
+        response.guardrailSessionId,
+        cached.guardrailSessionTtlSeconds || 300,
+      );
+    }
+    return response;
   }
+
 
   // ── Feedback Operations ────────────────────────────────────
 
@@ -289,6 +355,23 @@ export class ApiClient {
   /** Get the current guardrail configuration (read-only). Configure via NodeLoom UI. */
   async getGuardrailConfig(agentName: string): Promise<unknown> {
     return this.request(`/api/sdk/v1/agents/${agentName}/guardrails`);
+  }
+
+  // ── Remote Control (kill switch) ──────────────────────────────
+
+  /**
+   * Fetch the current remote-control payload for an agent. When the client was
+   * built with a {@link ControlRegistry}, the response is also merged into the
+   * registry so subsequent traces immediately observe the latest halt state.
+   */
+  async getAgentControl(agentName: string): Promise<AgentControlPayload> {
+    const response = await this.request<AgentControlPayload>(
+      `/api/sdk/v1/agents/${agentName}/control`,
+    );
+    if (this.controlRegistry) {
+      this.controlRegistry.updateFromPayload(response);
+    }
+    return response;
   }
 
   // ── Metrics Operations ───────────────────────────────────

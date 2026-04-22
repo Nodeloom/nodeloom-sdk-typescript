@@ -1,7 +1,7 @@
 /**
  * SDK version string, kept in sync with package.json.
  */
-export const SDK_VERSION = "0.7.0";
+export const SDK_VERSION = "0.10.0";
 
 /**
  * Language identifier included in every batch payload.
@@ -41,6 +41,20 @@ export interface NodeLoomConfig {
 
   /** If true, the SDK is disabled and no events are sent. Useful for local dev. */
   disabled?: boolean;
+
+  /**
+   * Interval in milliseconds between standalone control polls. Telemetry batch
+   * responses already piggy-back the control payload, so polling is mainly
+   * useful for sparse-traffic agents. Set to 0 to disable.
+   */
+  controlPollIntervalMs?: number;
+
+  /**
+   * Per-request HTTP timeout in milliseconds. Applies to both telemetry
+   * batches and control/guardrail calls. Lower values fail fast when the
+   * backend is unreachable; higher values tolerate slow networks.
+   */
+  requestTimeoutMs?: number;
 }
 
 /**
@@ -57,6 +71,8 @@ export interface ResolvedConfig {
   environment: string;
   silent: boolean;
   disabled: boolean;
+  controlPollIntervalMs: number;
+  requestTimeoutMs: number;
 }
 
 const DEFAULT_ENDPOINT = "https://api.nodeloom.io";
@@ -66,6 +82,17 @@ const DEFAULT_MAX_QUEUE_SIZE = 10_000;
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_RETRY_BASE_DELAY_MS = 1_000;
 const DEFAULT_ENVIRONMENT = "production";
+const DEFAULT_CONTROL_POLL_INTERVAL_MS = 60_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+
+// Trailing-slash stripping via a linear scan. The regex /\/+$/ would work
+// but CodeQL's polynomial-ReDoS check flags it; a single-pass slice is
+// equivalent and avoids the static-analysis noise.
+function stripTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s.charCodeAt(end - 1) === 47 /* '/' */) end--;
+  return end === s.length ? s : s.slice(0, end);
+}
 
 /**
  * Merges user-provided configuration with defaults to produce a fully resolved config.
@@ -75,7 +102,7 @@ export function resolveConfig(config: NodeLoomConfig): ResolvedConfig {
     throw new Error("NodeLoom SDK: apiKey is required");
   }
 
-  const endpoint = (config.endpoint ?? DEFAULT_ENDPOINT).replace(/\/+$/, "");
+  const endpoint = stripTrailingSlashes(config.endpoint ?? DEFAULT_ENDPOINT);
 
   if (endpoint && !endpoint.startsWith("https://") && !endpoint.includes("localhost") && !endpoint.includes("127.0.0.1")) {
     console.warn(`[nodeloom] WARNING: Endpoint '${endpoint}' does not use HTTPS. API keys will be sent in plaintext.`);
@@ -92,5 +119,7 @@ export function resolveConfig(config: NodeLoomConfig): ResolvedConfig {
     environment: config.environment ?? DEFAULT_ENVIRONMENT,
     silent: config.silent ?? false,
     disabled: config.disabled ?? false,
+    controlPollIntervalMs: config.controlPollIntervalMs ?? DEFAULT_CONTROL_POLL_INTERVAL_MS,
+    requestTimeoutMs: config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
   };
 }
