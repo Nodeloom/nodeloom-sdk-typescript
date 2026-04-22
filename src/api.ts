@@ -7,6 +7,16 @@
 
 import type { AgentControlPayload, ControlRegistry } from "./control.js";
 
+// Trailing-slash stripping via a linear scan. The regex /\/+$/ would work
+// but CodeQL's polynomial-ReDoS check flags it (endpoint is technically a
+// string input to the function). A single-pass slice is equivalent and
+// avoids the static-analysis noise.
+function stripTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s.charCodeAt(end - 1) === 47 /* '/' */) end--;
+  return end === s.length ? s : s.slice(0, end);
+}
+
 export interface ApiRequestOptions {
   method?: string;
   body?: unknown;
@@ -41,7 +51,7 @@ export class ApiClient {
     requestTimeoutMs: number = 30_000,
   ) {
     this.apiKey = apiKey;
-    this.endpoint = endpoint.replace(/\/+$/, "");
+    this.endpoint = stripTrailingSlashes(endpoint);
     this.controlRegistry = controlRegistry;
     this.requestTimeoutMs = requestTimeoutMs;
   }

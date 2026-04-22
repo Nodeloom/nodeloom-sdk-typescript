@@ -85,6 +85,15 @@ const DEFAULT_ENVIRONMENT = "production";
 const DEFAULT_CONTROL_POLL_INTERVAL_MS = 60_000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
+// Trailing-slash stripping via a linear scan. The regex /\/+$/ would work
+// but CodeQL's polynomial-ReDoS check flags it; a single-pass slice is
+// equivalent and avoids the static-analysis noise.
+function stripTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s.charCodeAt(end - 1) === 47 /* '/' */) end--;
+  return end === s.length ? s : s.slice(0, end);
+}
+
 /**
  * Merges user-provided configuration with defaults to produce a fully resolved config.
  */
@@ -93,7 +102,7 @@ export function resolveConfig(config: NodeLoomConfig): ResolvedConfig {
     throw new Error("NodeLoom SDK: apiKey is required");
   }
 
-  const endpoint = (config.endpoint ?? DEFAULT_ENDPOINT).replace(/\/+$/, "");
+  const endpoint = stripTrailingSlashes(config.endpoint ?? DEFAULT_ENDPOINT);
 
   if (endpoint && !endpoint.startsWith("https://") && !endpoint.includes("localhost") && !endpoint.includes("127.0.0.1")) {
     console.warn(`[nodeloom] WARNING: Endpoint '${endpoint}' does not use HTTPS. API keys will be sent in plaintext.`);
