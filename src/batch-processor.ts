@@ -1,4 +1,5 @@
 import { SDK_LANGUAGE, SDK_VERSION, type ResolvedConfig } from "./config.js";
+import type { AgentControlPayload, ControlRegistry } from "./control.js";
 import { EventQueue } from "./queue.js";
 import { Transport } from "./transport.js";
 import type { BatchPayload, TelemetryEvent } from "./types.js";
@@ -9,19 +10,25 @@ import type { BatchPayload, TelemetryEvent } from "./types.js";
  * Events are accumulated in a bounded queue. The processor drains
  * up to `maxBatchSize` events and sends them via the transport layer
  * either on a timer interval or when the batch size threshold is reached.
+ *
+ * When a {@link ControlRegistry} is supplied, the processor forwards every
+ * piggy-backed `control` field from the batch response so SDK consumers
+ * observe halt state without needing an extra round-trip.
  */
 export class BatchProcessor {
   private readonly config: ResolvedConfig;
   private readonly queue: EventQueue;
   private readonly transport: Transport;
+  private readonly controlRegistry: ControlRegistry | null;
   private flushTimer: ReturnType<typeof setInterval> | null = null;
   private isFlushing = false;
   private isShutdown = false;
 
-  constructor(config: ResolvedConfig) {
+  constructor(config: ResolvedConfig, controlRegistry: ControlRegistry | null = null) {
     this.config = config;
     this.queue = new EventQueue(config.maxQueueSize);
     this.transport = new Transport(config);
+    this.controlRegistry = controlRegistry;
   }
 
   /**
@@ -92,7 +99,13 @@ export class BatchProcessor {
           sdk_language: SDK_LANGUAGE,
         };
 
-        await this.transport.send(payload);
+        const result = await this.transport.send(payload);
+        if (this.controlRegistry && result.success && result.body && typeof result.body === "object") {
+          const control = (result.body as { control?: AgentControlPayload }).control;
+          if (control) {
+            this.controlRegistry.updateFromPayload(control);
+          }
+        }
       }
     } catch (error) {
       if (!this.config.silent) {

@@ -100,7 +100,11 @@ export class ManagedAgentsHandler {
               lastOutput = { text };
               if (self.guardrails) {
                 self.client.api
-                  .checkGuardrails("", text, { redactPii: true, filterContent: true })
+                  .checkGuardrails("", text, {
+                    redactPii: true,
+                    filterContent: true,
+                    agentName: self.agentName,
+                  })
                   .then((result: GuardrailResult) => {
                     if (!result.passed) {
                       self.client.event("guardrail_violation", "warn", {
@@ -110,7 +114,10 @@ export class ManagedAgentsHandler {
                       });
                     }
                   })
-                  .catch(() => {});
+                  .catch((err: unknown) => {
+                    const msg = err instanceof Error ? err.message : String(err);
+                    console.warn(`NodeLoom SDK: Anthropic guardrail output check failed: ${msg}`);
+                  });
               }
             }
             span.end("success");
@@ -156,6 +163,7 @@ export class ManagedAgentsHandler {
         return self.client.api.checkGuardrails("", text, {
           detectPromptInjection: true,
           redactPii: true,
+          agentName: self.agentName,
         });
       },
 
@@ -164,6 +172,7 @@ export class ManagedAgentsHandler {
         return self.client.api.checkGuardrails("", text, {
           redactPii: true,
           filterContent: true,
+          agentName: self.agentName,
         });
       },
 

@@ -13,6 +13,17 @@ describe("ApiClient", () => {
       expect((client as any).endpoint).toBe("https://example.com");
     });
 
+    it("strips multiple trailing slashes", () => {
+      // The non-regex implementation must still collapse ///// at the end.
+      const client = new ApiClient("sdk_test", "https://example.com/////");
+      expect((client as any).endpoint).toBe("https://example.com");
+    });
+
+    it("leaves interior slashes alone", () => {
+      const client = new ApiClient("sdk_test", "https://example.com/api/v2/");
+      expect((client as any).endpoint).toBe("https://example.com/api/v2");
+    });
+
     it("uses default endpoint", () => {
       const client = new ApiClient("sdk_test");
       expect((client as any).endpoint).toBe("https://api.nodeloom.io");
