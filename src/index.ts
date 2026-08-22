@@ -20,7 +20,7 @@
  * const span = trace.span("openai-call", SpanType.LLM);
  * span.setInput({ messages: [{ role: "user", content: "What is NodeLoom?" }] });
  * span.setOutput({ text: "NodeLoom is a workflow automation platform." });
- * span.setTokenUsage({ promptTokens: 15, completionTokens: 20, model: "gpt-4o" });
+ * span.setTokenUsage({ promptTokens: 15, completionTokens: 20, model: "gpt-5.6-terra" });
  * span.end();
  *
  * trace.end("success", {

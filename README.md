@@ -38,7 +38,7 @@ const trace = client.trace("my-agent", {
 const span = trace.span("openai-call", SpanType.LLM);
 span.setInput({ messages: [{ role: "user", content: "What is NodeLoom?" }] });
 span.setOutput({ text: "NodeLoom is an AI agent operations platform." });
-span.setTokenUsage({ promptTokens: 15, completionTokens: 20, model: "gpt-4o" });
+span.setTokenUsage({ promptTokens: 15, completionTokens: 20, model: "gpt-5.6-terra" });
 span.end();
 
 trace.end("success", {
@@ -69,7 +69,7 @@ A **trace** represents a single end-to-end agent execution. A **span** represent
 const parentSpan = trace.span("agent-step", SpanType.Agent);
 const childSpan = parentSpan.span("llm-call", SpanType.LLM);
 childSpan.setOutput({ response: "..." });
-childSpan.setTokenUsage({ promptTokens: 10, completionTokens: 20, model: "gpt-4o" });
+childSpan.setTokenUsage({ promptTokens: 10, completionTokens: 20, model: "gpt-5.6-terra" });
 childSpan.end();
 parentSpan.end();
 ```
