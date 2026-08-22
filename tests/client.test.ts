@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NodeLoomClient } from "../src/client.js";
 import { Trace } from "../src/trace.js";
+import { SDK_VERSION } from "../src/config.js";
 
 // Mock global fetch
 const mockFetch = vi.fn();
@@ -163,7 +164,7 @@ describe("NodeLoomClient", () => {
       expect(init.headers["Authorization"]).toBe("Bearer sdk_test");
 
       const body = JSON.parse(init.body);
-      expect(body.sdk_version).toBe("0.10.0");
+      expect(body.sdk_version).toBe(SDK_VERSION);
       expect(body.sdk_language).toBe("typescript");
       expect(body.events).toHaveLength(1);
       expect(body.events[0].type).toBe("trace_start");
