@@ -132,13 +132,13 @@ describe("Trace", () => {
       const client = createClient();
       const trace = client.trace("test-agent");
 
-      const span = trace.span("gpt-4o-call", SpanType.LLM);
+      const span = trace.span("gpt-5.6-terra-call", SpanType.LLM);
       span.setInput({ messages: [{ role: "user", content: "hello" }] });
       span.setOutput({ text: "Hi there!" });
       span.setTokenUsage({
         promptTokens: 150,
         completionTokens: 200,
-        model: "gpt-4o",
+        model: "gpt-5.6-terra",
       });
       span.end();
 
@@ -151,7 +151,7 @@ describe("Trace", () => {
       expect(spanEvent.type).toBe("span");
       expect(spanEvent.trace_id).toBe(trace.id);
       expect(spanEvent.span_id).toBe(span.id);
-      expect(spanEvent.name).toBe("gpt-4o-call");
+      expect(spanEvent.name).toBe("gpt-5.6-terra-call");
       expect(spanEvent.span_type).toBe("llm");
       expect(spanEvent.status).toBe("success");
       expect(spanEvent.parent_span_id).toBeNull();
@@ -163,7 +163,7 @@ describe("Trace", () => {
         prompt_tokens: 150,
         completion_tokens: 200,
         total_tokens: 350,
-        model: "gpt-4o",
+        model: "gpt-5.6-terra",
       });
       expect(spanEvent.timestamp).toBeTruthy();
       expect(spanEvent.end_timestamp).toBeTruthy();
@@ -324,7 +324,7 @@ describe("Trace", () => {
       llmSpan.setTokenUsage({
         promptTokens: 15,
         completionTokens: 10,
-        model: "gpt-4o",
+        model: "gpt-5.6-terra",
       });
       llmSpan.end();
 
