@@ -1,7 +1,7 @@
 /**
  * SDK version string, kept in sync with package.json.
  */
-export const SDK_VERSION = "0.10.0";
+export const SDK_VERSION = "0.10.1";
 
 /**
  * Language identifier included in every batch payload.

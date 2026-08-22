@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { BatchProcessor } from "../src/batch-processor.js";
 import { resolveConfig, type ResolvedConfig } from "../src/config.js";
 import type { TraceStartEvent, TelemetryEvent } from "../src/types.js";
+import { SDK_VERSION } from "../src/config.js";
 
 // Mock global fetch
 const mockFetch = vi.fn();
@@ -105,7 +106,7 @@ describe("BatchProcessor", () => {
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.events).toHaveLength(2);
-      expect(body.sdk_version).toBe("0.10.0");
+      expect(body.sdk_version).toBe(SDK_VERSION);
       expect(body.sdk_language).toBe("typescript");
     });
 
@@ -420,7 +421,7 @@ describe("BatchProcessor", () => {
       expect(init.headers["Content-Type"]).toBe("application/json");
       expect(init.headers["Authorization"]).toBe("Bearer sdk_test");
       expect(init.headers["User-Agent"]).toBe(
-        "nodeloom-sdk-typescript/0.10.0"
+        `nodeloom-sdk-typescript/${SDK_VERSION}`
       );
     });
 
